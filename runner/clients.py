@@ -1,34 +1,26 @@
-import os
-from openai import OpenAI
-import requests
+import time
+import random
 
+def call_model(prompt: str, model_name: str):
+    """
+    Simule un appel API modèle.
+    Remplace par ton appel OpenAI / autre provider.
+    """
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    # Simulation latence variable
+    simulated_latency = random.uniform(0.5, 1.5)
+    time.sleep(simulated_latency)
 
-def run_openai(prompt):
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.2
-    )
-    return response.choices[0].message.content
+    # Simulation réponse
+    response = f"[{model_name}] Response to: {prompt}"
 
-def run_local_ollama(prompt):
-    r = requests.post(
-        "http://host.docker.internal:11434/api/generate",
-        json={
-            "model": "llama3",
-            "prompt": prompt,
-            "stream": False
-        },
-        timeout=120
-    )
-    return r.json()["response"]
+    # Simulation token usage
+    input_tokens = len(prompt.split())
+    output_tokens = random.randint(20, 60)
 
-def run_model(model_name, prompt):
-    if model_name == "openai":
-        return run_openai(prompt)
-    elif model_name == "ollama":
-        return run_local_ollama(prompt)
-    else:
-        raise ValueError("Unknown model")
+    return {
+        "response": response,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "latency": simulated_latency
+    }
