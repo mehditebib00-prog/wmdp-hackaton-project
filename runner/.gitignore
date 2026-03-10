@@ -1,0 +1,29 @@
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venvv/
+venv/
+env/
+
+# PyCharm files
+.idea/
+*.iml
+
+# VS Code files
+.vscode/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Hugging Face cache (optional)
+.cache/huggingface/
+
+# Sensitive API keys / configs
+.env
