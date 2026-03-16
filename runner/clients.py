@@ -1,26 +1,46 @@
+import os
 import time
-import random
+from enum import auto
 
-def call_model(prompt: str, model_name: str):
-    """
-    Simule un appel API modèle.
-    Remplace par ton appel OpenAI / autre provider.
-    """
+from transformers import pipeline
 
-    # Simulation latence variable
-    simulated_latency = random.uniform(0.5, 1.5)
-    time.sleep(simulated_latency)
 
-    # Simulation réponse
-    response = f"[{model_name}] Response to: {prompt}"
+hf_models = {
+    "mistral": pipeline(
+        "text-generation",
+        model="mistralai/Mistral-7B-Instruct-v0.2",
+        device=0
+    ),
 
-    # Simulation token usage
+    "phi": pipeline(
+        "text-generation",
+        model="microsoft/phi-2",
+        device_map="auto"
+    )
+}
+
+def call_model(prompt, model_name):
+    start = time.time()
+    model_name = model_name.lower()
+
+    if model_name not in hf_models:
+        raise ValueError(f"Unknown model: {model_name}")
+
+    generator = hf_models[model_name]
+
+    response = generator(prompt, max_new_tokens=150)
+    text = response[0]["generated_text"]
+    if not text :
+        print("No response from model")
+
+    latency = time.time() - start
+
     input_tokens = len(prompt.split())
-    output_tokens = random.randint(20, 60)
+    output_tokens = len(text.split())
 
     return {
-        "response": response,
+        "response": text.strip(),
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
-        "latency": simulated_latency
+        "latency": latency
     }
