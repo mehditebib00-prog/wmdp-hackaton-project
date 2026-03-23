@@ -2,7 +2,11 @@ import json
 import statistics
 import datetime
 import time
+from logging import exception
+
 from elasticsearch import Elasticsearch
+from sympy.codegen.ast import none
+
 from clients import call_model
 from evaluator import evaluate_response
 
@@ -34,19 +38,30 @@ def send_to_elk(es_client, data):
 
 
 def wait_for_elasticsearch(url="http://localhost:9200", timeout=60):
-    es = Elasticsearch(url, verify_certs=False, request_timeout=30)
+    es = Elasticsearch(
+        url,
+        verify_certs=False,
+        ssl_show_warn=False,
+        request_timeout=30,
+        basic_auth=("elastic", "changeme123")
+    )
+
     start = time.time()
     while time.time() - start < timeout:
         try:
             if es.ping():
                 print("Connected to Elasticsearch")
                 return es
-        except Exception:
-            pass
-        print("⏳ Waiting for Elasticsearch...")
-        time.sleep(5)
-    print("⚠ Elasticsearch not reachable, continuing without ELK")
-    return None
+            else:
+                # Add this — ping() swallows errors, info() won't
+                info = es.info()
+                print("Connected but ping returned False?", info)
+                return es
+        except Exception as e:
+            print(f"Elasticsearch error: {type(e).__name__}: {e}")
+
+        print("Waiting for Elasticsearch...")
+        time.sleep(2)
 
 
 def run_benchmark():
@@ -70,6 +85,10 @@ def run_benchmark():
             try:
                 # Only pass valid generation args; avoid deprecated warnings
                 result = call_model(question, model)
+                result.setdefault("input_tokens", 0)
+                result.setdefault("output_tokens", 0)
+                result.setdefault("latency", 0)
+                result.setdefault("response", "Refused or error")
             except Exception as e:
                 print(f"Error on prompt {item['id']}: {e}")
                 result = {

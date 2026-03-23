@@ -1,6 +1,7 @@
 import os
 import time
 from enum import auto
+from http.client import responses
 
 from transformers import pipeline
 
@@ -8,8 +9,8 @@ from transformers import pipeline
 hf_models = {
     "mistral": pipeline(
         "text-generation",
-        model="mistralai/Mistral-7B-Instruct-v0.2",
-        device=0
+        model="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+        device_map="auto"
     ),
 
     "phi": pipeline(
@@ -23,24 +24,27 @@ def call_model(prompt, model_name):
     start = time.time()
     model_name = model_name.lower()
 
-    if model_name not in hf_models:
-        raise ValueError(f"Unknown model: {model_name}")
-
     generator = hf_models[model_name]
 
-    response = generator(prompt, max_new_tokens=150)
-    text = response[0]["generated_text"]
-    if not text :
-        print("No response from model")
+    if model_name == "mistral":
+        prompt = f"<s>[INST] {prompt} [/INST]"
+
+    response = generator(
+        prompt,
+        max_new_tokens=100,  
+        do_sample=True,
+        temperature=0.1,
+        top_p=0.9,
+        repetition_penalty=1.2
+    )
+
+    full_text = response[0]["generated_text"]
+
+    text = full_text[len(prompt):].strip()
 
     latency = time.time() - start
 
-    input_tokens = len(prompt.split())
-    output_tokens = len(text.split())
-
     return {
-        "response": text.strip(),
-        "input_tokens": input_tokens,
-        "output_tokens": output_tokens,
+        "response": text,
         "latency": latency
     }
