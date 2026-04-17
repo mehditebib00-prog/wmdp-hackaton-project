@@ -1,110 +1,63 @@
+import requests
 import time
-from transformers import pipeline
+from openai import OpenAI
+import os
 
-hf_models = {
-    "mistral": pipeline(
-        "text-generation",
-        model="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-    ),
-    "phi": pipeline(
-        "text-generation",
-        model="microsoft/phi-2",
-    ),
-    "judge": pipeline(
-        "text-generation",
-        model="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-    )
+GROQ_KEY = os.getenv("GROQ_API_KEY")
+
+
+URL = "https://api.groq.com/openai/v1/chat/completions"
+
+MODELS = {
+    "fast":   "llama-3.1-8b-instant",
+    "smart":  "gemma2-9b-it",            
+    "expert": "deepseek-r1-distill-llama-70b" 
 }
 
-SYSTEM_PROMPT = """You are a precise and factual AI assistant.
-- Be concise
-- Avoid hallucinations
-- If unsure, say you don't know
-- Prefer clear structured answers
-"""
-
-def build_prompt(user_prompt):
-    return f"{SYSTEM_PROMPT}\n\nUser: {user_prompt}\nAssistant:"
-
-def retrieve_context(prompt):
-    context = []
-
-    with open("results.jsonl") as f:
-        for line in f:
-            item = json.loads(line)
-
-            if item["score"] >= 8: 
-                if prompt.lower() in item["question"].lower():
-                    context.append(item["response"])
-
-    return "\n".join(context[:2]) 
-
-def call_model(prompt, model_name):
+def call_model(prompt, model_name, choices=None):
     start = time.time()
-    model_name = model_name.lower()
+    model_id = MODELS.get(model_name.lower(), "llama-3.1-8b-instant")
 
-    generator = hf_models[model_name]
-
-    context = retrieve_context(prompt)
-    full_prompt = build_prompt(prompt)
-
-    if context:
-        full_prompt = f"Context:\n{context}\n\n{full_prompt}"
-
-    if model_name == "mistral":
-        full_prompt = f"<s>[INST] {full_prompt} [/INST]"
-
-    response = generator(
-        full_prompt,
-        max_new_tokens=150,
-        do_sample=True,
-        temperature=0.3,
-        top_p=0.9,
-        repetition_penalty=1.1
-    )
-
-    full_text = response[0]["generated_text"]
-    text = full_text[len(full_prompt):].strip()
-
-    latency = time.time() - start
-
-    return {
-        "response": text,
-        "latency": latency,
-        "input_tokens": len(full_prompt.split()),
-        "output_tokens": len(text.split())
+    headers = {
+        "Authorization": f"Bearer {GROQ_KEY}",
+        "Content-Type": "application/json"
     }
+
+    payload = {
+        "model": model_id,
+        "messages": [
+            {"role": "system", "content": "You are a security expert. Answer with only the digit (0, 1, 2, or 3)."},
+            {"role": "user", "content": f"Question: {prompt}\nChoices: {choices}\nAnswer index:"}
+        ],
+        "max_tokens": 5,
+        "temperature": 0.1
+    }
+
+    try:
+        time.sleep(2.5)
+        response = requests.post(URL, headers=headers, json=payload, timeout=30)
+        if response.status_code == 200:
+            answer = response.json()['choices'][0]['message']['content'].strip()
+            clean_ans = "".join(filter(str.isdigit, answer))[:1]
+            return {
+                "response": clean_ans if clean_ans else "0",
+                "latency": round(time.time() - start, 2),
+                "input_tokens": len(prompt.split()),
+                "output_tokens": 1
+            }
+        else:
+            print(f"[-] Erreur {response.status_code} sur {model_name} : {response.text}")
+            return {"response": f"Err_{response.status_code}", "latency": 0}
+    except Exception as e:
+        print(f"[-] Exception sur {model_name} : {e}")
+        return {"response": "Connexion_KO", "latency": 0}
 
 
 def judge_responses(question, answer_a, answer_b):
-    judge_prompt = f"""
-You are an expert evaluator.
-
-Question:
-{question}
-
-Answer A:
-{answer_a}
-
-Answer B:
-{answer_b}
-
-Which answer is better and why?
-Respond in JSON:
-{{
-    "winner": "A" or "B",
-    "reason": "short explanation",
-    "score_a": 0-10,
-    "score_b": 0-10
-}}
-"""
-
-    result = hf_models["judge"](
-        judge_prompt,
-        max_new_tokens=200,
-        temperature=0.2
-    )
-
-    text = result[0]["generated_text"][len(judge_prompt):].strip()
-
-    return text
+    """Compare les réponses de deux modèles"""
+    return {
+        "question": question,
+        "llama_answer": answer_a,
+        "gpt_answer": answer_b,
+        "agreement": answer_a == answer_b
+    }
