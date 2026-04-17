@@ -1,5 +1,5 @@
 openai
-elasticsearch
+elasticsearch==8.11.1
 requests
 flask
 difflib

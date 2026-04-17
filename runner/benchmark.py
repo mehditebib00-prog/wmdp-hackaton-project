@@ -63,8 +63,8 @@ def run_benchmark():
         prompts = json.load(f)
 
     all_results = []
-
-    for item in prompts:
+    
+    for item in prompts[0:4]:
         question = item["question"]
         print(f"\n--- Prompt {item['id']} ---")
 
@@ -93,18 +93,26 @@ def run_benchmark():
         for model in MODELS:
             result = responses[model]
 
-            score = evaluate_response(question, result["response"])
-            cost = compute_cost(result["input_tokens"], result["output_tokens"])
+            response_text = result.get("response", "Error")
+            latency = result.get("latency", 0)
+            input_tokens = result.get("input_tokens", 0) or 0
+            output_tokens = result.get("output_tokens", 0) or 0
+
+            score = evaluate_response(question, response_text)
+            cost = compute_cost(input_tokens, output_tokens)
 
             record = {
                 "model": model,
-                "prompt_id": item["id"],
+                "prompt_id": item.get("id", 0),
                 "question": question,
-                "response": result["response"],
-                "latency": result["latency"],
+                "response": response_text,
+                "latency": latency,
                 "score": score,
                 "cost": cost,
-                "judge_result": judge_result  # 🔥 added
+                "judge_result": json.dumps(judge_result, ensure_ascii=False),
+                "judge_agreement": judge_result.get("agreement", False),
+                "judge_llama_answer": judge_result.get("llama_answer"),
+                "judge_gpt_answer": judge_result.get("gpt_answer")
             }
 
             all_results.append(record)
@@ -116,7 +124,7 @@ def run_benchmark():
         for r in all_results:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
-    print("\n✅ Benchmark completed")
+    print("\n Benchmark completed")
 
 
 if __name__ == "__main__":
