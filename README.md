@@ -20,9 +20,6 @@
 - [Methodology](#10-methodology--scoring)
 - [Credits](#11-credits)
 - [Limitations](#12-Limitations)
-- [FutureWork] (#13-FutureWork)
-- [Conclusion] (#14-Conclusion)
-- [Academic Context] (#15-AcademicContext)
 
 ## 1. Executive Summary
 
